@@ -9,16 +9,10 @@ function SelectionTransformer({
   updateObjects,
 }) {
   useEffect(() => {
-    if (
-      selectedObject &&
-      transformerRef.current &&
-      shapeRef.current
-    ) {
+    if (selectedObject && transformerRef.current && shapeRef.current) {
       transformerRef.current.nodes([shapeRef.current]);
 
-      transformerRef.current
-        .getLayer()
-        .batchDraw();
+      transformerRef.current.getLayer().batchDraw();
     }
   }, [selectedIds, selectedObject]);
 
@@ -31,10 +25,7 @@ function SelectionTransformer({
       ref={transformerRef}
       rotateEnabled={false}
       boundBoxFunc={(oldBox, newBox) => {
-        if (
-          newBox.width < 50 ||
-          newBox.height < 30
-        ) {
+        if (newBox.width < 50 || newBox.height < 30) {
           return oldBox;
         }
 
@@ -49,11 +40,9 @@ function SelectionTransformer({
         const scaleY = node.scaleY();
 
         if (selectedObject.type === "rectangle") {
-          const newWidth =
-            node.width() * scaleX;
+          const newWidth = node.width() * scaleX;
 
-          const newHeight =
-            node.height() * scaleY;
+          const newHeight = node.height() * scaleY;
 
           node.scaleX(1);
           node.scaleY(1);
@@ -69,12 +58,8 @@ function SelectionTransformer({
                 : item,
             ),
           );
-        }
-
-        else if (selectedObject.type === "circle") {
-          const newRadius =
-            node.radius() *
-            Math.max(scaleX, scaleY);
+        } else if (selectedObject.type === "circle") {
+          const newRadius = node.radius() * Math.max(scaleX, scaleY);
 
           node.scaleX(1);
           node.scaleY(1);
@@ -89,14 +74,10 @@ function SelectionTransformer({
                 : item,
             ),
           );
-        }
+        } else if (selectedObject.type === "ellipse") {
+          const newRadiusX = node.radiusX() * scaleX;
 
-        else if (selectedObject.type === "ellipse") {
-          const newRadiusX =
-            node.radiusX() * scaleX;
-
-          const newRadiusY =
-            node.radiusY() * scaleY;
+          const newRadiusY = node.radiusY() * scaleY;
 
           node.scaleX(1);
           node.scaleY(1);
@@ -108,6 +89,22 @@ function SelectionTransformer({
                     ...item,
                     radiusX: newRadiusX,
                     radiusY: newRadiusY,
+                  }
+                : item,
+            ),
+          );
+        } else if (selectedObject.type === "text") {
+          const newFontSize = node.fontSize() * Math.max(scaleX, scaleY);
+
+          node.scaleX(1);
+          node.scaleY(1);
+ 
+          updateObjects((prevObjects) =>
+            prevObjects.map((item) =>
+              item.id === selectedIds[0]
+                ? {
+                    ...item,
+                    fontSize: newFontSize,
                   }
                 : item,
             ),

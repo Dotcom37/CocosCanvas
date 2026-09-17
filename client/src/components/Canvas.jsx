@@ -8,6 +8,9 @@ function Canvas() {
   const objects = canvasStore((state) => state.objects);
   const selectedIds = canvasStore((state) => state.selectedIds);
   const setSelectedIds = canvasStore((state) => state.setSelectedIds);
+  
+  const editingText = canvasStore((state) => state.editingText);
+  const setEditingText = canvasStore((state) => state.setEditingText);
 
   const tool = canvasStore((state) => state.tool);
   const setTool = canvasStore((state) => state.setTool);
@@ -16,9 +19,7 @@ function Canvas() {
 
   const transformerRef = useRef(null);
   const shapeRef = useRef(null);
-
   // Temporary state for the HTML input
-  const [editingText, setEditingText] = useState(null);
 
   const selectedObject = objects.find(
     (obj) => obj.id === selectedIds[0]
@@ -33,37 +34,53 @@ function Canvas() {
     }
 
     const position = stage.getPointerPosition();
-
+     
+    if(tool === "line"){
+      const newLine = {
+        id : Date.now(),
+        type : "line",
+        points : [position.x, position.y, position.x + 100, position.y + 100],
+        stroke : "black",
+        strokeWidth : 2,
+      } 
+      updateObjects((prevObjects) => [
+         ...prevObjects,
+         newLine
+      ])
+      setSelectedIds([newLine.id]);
+      setTool("select");
+    }
     // TEXT
-    // if (tool === "text") {
-    //   const newText = {
-    //     id: Date.now(),
-    //     type: "text",
-    //     x: position.x,
-    //     y: position.y,
-    //     text: "",
-    //     fontSize: 20,
-    //   };
+    else if (tool === "text") {
+    
+      const newText = {
+        id: Date.now(),
+        type: "text",
+        x: position.x,
+        y: position.y,
+        text: "Text",
+        fontSize: 20,
+      };
 
-    //   updateObjects((prevObjects) => [
-    //     ...prevObjects,
-    //     newText,
-    //   ]);
+      updateObjects((prevObjects) => [
+        ...prevObjects,
+        newText,
+      ]);
 
-    //   setSelectedIds([newText.id]);
+      setSelectedIds([newText.id]);
 
-    //   // Open input immediately
-    //   setEditingText({
-    //     id: newText.id,
-    //     x: position.x,
-    //     y: position.y,
-    //   });
+      // Open input immediately
+      setEditingText({
+        id: newText.id,
+        x: position.x,
+        y: position.y,
+      });
 
-    //   setTool("select");
-    // }
+      setTool("select");
+    }
 
     // RECTANGLE
-    if (tool === "rectangle") {
+    else if (tool === "rectangle") {
       const newRectangle = {
         id: Date.now(),
         type: "rectangle",
@@ -145,7 +162,7 @@ function Canvas() {
                   ? shapeRef
                   : null
               }
-              setEditingText={setEditingText}
+              
             />
           ))}
 
@@ -160,7 +177,8 @@ function Canvas() {
       </Stage>
 
       {/* HTML input used while typing text */}
-      {/*{editingText && (
+      {/*  */}
+      {editingText && (
         <input
           autoFocus
           value={
@@ -172,7 +190,7 @@ function Canvas() {
             position: "absolute",
             left: editingText.x,
             top: editingText.y,
-            fontSize: "20px",
+            fontSize: "40px",
             border: "1px solid black",
             outline: "none",
           }}
@@ -192,7 +210,7 @@ function Canvas() {
             setEditingText(null);
           }}
         />
-      )}*/}
+      )} 
     </>
   );
 }

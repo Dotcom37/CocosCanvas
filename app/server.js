@@ -1,17 +1,40 @@
-const express = require("express");
+import express from "express";
+import http from "node:http";
+import { Server } from "socket.io";
+import * as Y from "yjs";
 
 const app = express();
 
-app.use(express.json());
+const httpServer = http.createServer(app);
 
-app.get("/", (req, res) => {
-    res.json({
-        message: "Collaborative Canvas API is running"
-    });
+const io = new Server(httpServer, {
+  cors: {
+    origin: "http://localhost:5173",
+  },
 });
 
-const PORT = 5000;
+const doc = new Y.Doc();
 
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+io.on("connection", (socket) => {
+  console.log("USER CONNECTED:", socket.id);
+
+  // Send current server Yjs state to new client
+  const state = Y.encodeStateAsUpdate(doc);
+  socket.emit("yjs-update", Array.from(state));
+
+  socket.on("yjs-update", (update) => {
+    console.log("YJS UPDATE RECEIVED");
+
+    Y.applyUpdate(doc, new Uint8Array(update));
+
+    socket.broadcast.emit("yjs-update", update);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("USER DISCONNECTED:", socket.id);
+  });
+});
+
+httpServer.listen(3000, () => {
+  console.log("Server running on port 3000");
 });

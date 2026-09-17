@@ -4,16 +4,20 @@ import {
   Circle,
   Ellipse,
   Text,
+  Line
 } from "react-konva";
 
 import canvasStore from "../store/canvasStore";
 
-function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
+function CanvasObject({obj,isSelected,shapeRef}) {
   const selectedIds = canvasStore((state) => state.selectedIds);
 
   const setSelectedIds = canvasStore((state) => state.setSelectedIds);
 
   const updateObjects = canvasStore((state) => state.updateObjects);
+
+  const editingText = canvasStore((state) => state.editingText);
+  const setEditingText = canvasStore((state) => state.setEditingText);
 
   const handleClick = (e) => {
     if (e.evt.ctrlKey) {
@@ -30,16 +34,37 @@ function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
   };
 
   const handleDragEnd = (e) => {
-    const { x, y } = e.target.position();
+  const node = e.target;
+
+  if (obj.type === "line") {
+    const dx = node.x();
+    const dy = node.y();
 
     updateObjects((prevObjects) =>
       prevObjects.map((item) =>
         item.id === obj.id
-          ? { ...item, x, y }
+          ? {
+              ...item,
+              points: item.points.map((point, i) =>
+                i % 2 === 0 ? point + dx : point + dy
+              ),
+            }
           : item
       )
     );
-  };
+
+    node.position({ x: 0, y: 0 });
+    return;
+   }
+
+  const { x, y } = node.position();
+
+  updateObjects((prevObjects) =>
+    prevObjects.map((item) =>
+      item.id === obj.id ? { ...item, x, y } : item
+    )
+  );
+};
 
   const commonProps = {
     ref: isSelected ? shapeRef : null,
@@ -82,7 +107,7 @@ function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
   }
 
   // CIRCLE
-  if (obj.type === "circle") {
+  else if (obj.type === "circle") {
     return (
       <Circle
         key={obj.id}
@@ -93,7 +118,7 @@ function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
   }
 
   // ELLIPSE
-  if (obj.type === "ellipse") {
+  else if (obj.type === "ellipse") {
     return (
       <Ellipse
         key={obj.id}
@@ -105,7 +130,7 @@ function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
   }
 
   // TEXT
-  if (obj.type === "text") {
+  else if (obj.type === "text") {
     return (
       <Text
         key={obj.id}
@@ -119,6 +144,22 @@ function CanvasObject({obj,isSelected,shapeRef,setEditingText}) {
             y: obj.y,
           });
         }}
+      />
+    );
+  }
+
+  else if(obj.type === "line"){
+    return (
+      <Line
+        key={obj.id}
+        ref={isSelected ? shapeRef : null}
+        points={obj.points}
+        stroke={obj.stroke}
+        strokeWidth={obj.strokeWidth}
+        draggable={true}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        hitStrokeWidth={20}
       />
     );
   }
