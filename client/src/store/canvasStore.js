@@ -4,40 +4,13 @@ import * as Y from "yjs";
 
 const socket = io("http://localhost:3000");
 
-// Yjs document for this canvas
-const doc = new Y.Doc();
+const docs = new Map();
 
-// Shared array containing canvas objects
-const yObjects = doc.getArray("objects");
-yObjects.push([
-  {
-    id: 1,
-    type: "rectangle",
-    x: 100,
-    y: 100,
-    width: 200,
-    height: 100,
-  },
-  {
-    id: 2,
-    type: "rectangle",
-    x: 400,
-    y: 200,
-    width: 200,
-    height: 100,
-  },
-]);
-
-// Send only Yjs updates through Socket.IO
-doc.on("update", (update, origin) => {
-  if (origin === "local") {
-    console.log("SENDING YJS UPDATE");
-    socket.emit("yjs-update", update);
-  }
-});
+let doc = null
+let yObjects = null
 
 const canvasStore = create((set) => ({
-  objects: yObjects.toArray(),
+  objects: [],
   
   selectedIds: [],
   setSelectedIds: (ids) => set({ selectedIds: ids }),
@@ -64,6 +37,16 @@ const canvasStore = create((set) => ({
       // Update Yjs
       doc.transact(() => {
         yObjects.delete(0, yObjects.length);
+        console.log(
+          "OBJECT IDS:",
+          newObjects.map(obj => obj.id)
+        );
+        console.log(
+          "DUPLICATES:",
+          newObjects
+            .map(obj => obj.id)
+            .filter((id, index, arr) => arr.indexOf(id) !== index)
+        );
         yObjects.push(newObjects);
         
       }, "local");
@@ -81,6 +64,37 @@ const canvasStore = create((set) => ({
     set({
       objects: yObjects.toArray(),
     });
+  },
+  joinRoom: (roomId) =>{
+      
+      doc = docs.get(roomId);
+
+      if (!doc) {
+        doc = new Y.Doc();
+        docs.set(roomId, doc);
+
+        doc.on("update", (update, origin) => {
+          if (origin === "local") {
+            console.log("SENDING YJS UPDATE");
+            socket.emit("yjs-update", update);
+          }
+        });
+      }
+      yObjects = doc.getArray("objects");
+
+      set({
+        objects: yObjects.toArray(),
+        past: [],
+        future: [],
+        selectedIds: [],
+      });
+
+      const email = localStorage.getItem("email")
+  
+      socket.emit("join_room", {
+        email,
+        roomId
+      })
   },
 
   undo: () => {
@@ -114,7 +128,9 @@ const canvasStore = create((set) => ({
 
 // Receive Yjs update from server
 socket.on("connect", () => {
+
   console.log("CONNECTED TO SERVER:", socket.id);
+
 });
 
 socket.on("yjs-update", (update) => {
@@ -122,6 +138,7 @@ socket.on("yjs-update", (update) => {
 
   Y.applyUpdate(doc, new Uint8Array(update),"remote");
   console.log("YJS OBJECTS:", yObjects.toArray());
+  console.log("UPDATING ZUSTAND FROM YJS");
   canvasStore.getState().setObjectsFromYjs();
 });
 

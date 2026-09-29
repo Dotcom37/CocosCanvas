@@ -1,10 +1,17 @@
 import { Stage, Layer } from "react-konva";
-import CanvasObject from "./canvasObject";
+import CanvasObject from "./CanvasObject.jsx";
 import SelectionTransformer from "./SelectionTransformer";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useParams } from "react-router";
 import canvasStore from "../store/canvasStore";
-
+import ShareLink from "../components/shareLink";
+import { useNavigate } from "react-router";
+import { House } from "lucide-react"
 function Canvas() {
+  const {roomid} = useParams()
+  useEffect(()=>{
+      canvasStore.getState().joinRoom(roomid)
+  }, [roomid])
   const objects = canvasStore((state) => state.objects);
   const selectedIds = canvasStore((state) => state.selectedIds);
   const setSelectedIds = canvasStore((state) => state.setSelectedIds);
@@ -19,15 +26,14 @@ function Canvas() {
 
   const transformerRef = useRef(null);
   const shapeRef = useRef(null);
-  // Temporary state for the HTML input
-
+  const [showGenerate, setShowGenerate] = useState(false)
   const selectedObject = objects.find(
     (obj) => obj.id === selectedIds[0]
   );
-
+  const navigate = useNavigate()
+  
   const handleCanvasClick = (e) => {
     const stage = e.target.getStage();
-
     // Only handle clicks directly on the canvas
     if (e.target !== stage) {
       return;
@@ -146,6 +152,18 @@ function Canvas() {
 
   return (
     <>
+      <div className="relative">
+        <button 
+        className="absolute py-2 px-4 top-4 left-4 z-10 bg-blue-500 text-white rounded-md " 
+        onClick={() => navigate('/')}>
+           <House/>
+        </button>
+        <button 
+        
+        className="absolute py-2 px-4 top-4 right-4 z-10 bg-blue-500 text-white rounded-md " onClick={() => setShowGenerate(true)}>
+           Share
+        </button>
+        {showGenerate && <ShareLink setShowGenerate={setShowGenerate}/>}
       <Stage
         width={window.innerWidth}
         height={window.innerHeight}
@@ -159,11 +177,11 @@ function Canvas() {
               isSelected={selectedIds.includes(obj.id)}
               shapeRef={
                 selectedIds[0] === obj.id
-                  ? shapeRef
-                  : null
+                ? shapeRef
+                : null
               }
               
-            />
+              />
           ))}
 
           <SelectionTransformer
@@ -172,7 +190,7 @@ function Canvas() {
             transformerRef={transformerRef}
             shapeRef={shapeRef}
             updateObjects={updateObjects}
-          />
+            />
         </Layer>
       </Stage>
 
@@ -180,37 +198,38 @@ function Canvas() {
       {/*  */}
       {editingText && (
         <input
-          autoFocus
-          value={
-            objects.find(
-              (obj) => obj.id === editingText.id
-            )?.text || ""
-          }
-          style={{
-            position: "absolute",
-            left: editingText.x,
-            top: editingText.y,
-            fontSize: "40px",
-            border: "1px solid black",
+        autoFocus
+        value={
+          objects.find(
+            (obj) => obj.id === editingText.id
+          )?.text || ""
+        }
+        style={{
+          position: "absolute",
+          left: editingText.x,
+          top: editingText.y,
+          fontSize: "40px",
+          border: "1px solid black",
             outline: "none",
           }}
           onChange={(e) => {
             updateObjects((prevObjects) =>
               prevObjects.map((obj) =>
                 obj.id === editingText.id
-                  ? {
-                      ...obj,
-                      text: e.target.value,
-                    }
-                  : obj
-              )
-            );
-          }}
-          onBlur={() => {
-            setEditingText(null);
-          }}
-        />
-      )} 
+            ? {
+              ...obj,
+              text: e.target.value,
+            }
+            : obj
+          )
+        );
+      }}
+      onBlur={() => {
+        setEditingText(null);
+      }}
+      />
+    )} 
+    </div>
     </>
   );
 }

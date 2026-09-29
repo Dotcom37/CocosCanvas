@@ -66,7 +66,7 @@ function CanvasObject({obj,isSelected,shapeRef}) {
   );
 };
 
-  const commonProps = {
+const commonProps = {
     ref: isSelected ? shapeRef : null,
 
     x: obj.x,
@@ -92,7 +92,7 @@ function CanvasObject({obj,isSelected,shapeRef}) {
     onClick: handleClick,
 
     onDragEnd: handleDragEnd,
-  };
+};
 
   // RECTANGLE
   if (obj.type === "rectangle") {

@@ -47,7 +47,7 @@ function Toolbar() {
 const styles = {
   panel: {
     position: "absolute",
-    top: 12,
+    top: 64,
     left: 12,
     zIndex: 10,
     display: "flex",

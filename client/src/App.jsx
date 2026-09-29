@@ -1,25 +1,27 @@
-import { useState } from "react";
+import LandingPage from "./pages/landingPage";
+import Login from "./components/login/login";
+import Signup from "./components/login/signup";
+import OTP from "./components/login/otp";
+import CanvasPage from "./pages/CanvasPage";
+import {
+  BrowserRouter,
+  Routes,
+  Route
+} from "react-router-dom";
 
-import Toolbar from "./components/toolbar";
-import Canvas from "./components/canvas";
-import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcut";
 
 function App() {
-  console.log("Rendering App component");
-
-  useKeyboardShortcuts();
+  
   return (
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        backgroundColor: "white",
-      }}
-    >
-      <Toolbar/>
-
-      <Canvas/>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/otp" element={<OTP/>}/>
+        <Route path="/canvas/:roomid" element={<CanvasPage/>} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
