@@ -13,7 +13,7 @@ const Navbar = ({setShowLogout}) => {
   useEffect(() => {
     const handleRes = async (e) => {
       try {
-        const response = await fetch("http://localhost:3000/api/auth/me", {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
           method: "GET",
           headers:{
             "content-type": "application/json",

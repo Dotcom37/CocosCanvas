@@ -17,7 +17,7 @@ const Signup = () => {
       const userData = {name:Name, email:email, password: Password} 
       console.log("here we go")
       try{
-          const response = await fetch("http://localhost:3000/api/auth/signup",{
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/signup`,{
                 method:'POST',
                 headers:{
                   "content-type":"application/json"

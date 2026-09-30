@@ -20,7 +20,7 @@ const CanvasPage = () => {
     const token = localStorage.getItem("token");
 
     const response = await fetch(
-      "http://localhost:3000/api/auth/is-authenticated",
+      `${import.meta.env.VITE_API_URL}/api/auth/is-authenticated`,
       {
         headers: {
           authorization: `Bearer ${token}`,

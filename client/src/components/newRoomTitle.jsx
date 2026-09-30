@@ -10,7 +10,7 @@ const NewRoomTitle = ({setShowCreateRoom}) => {
         e.preventDefault()
         
         try{
-            const response = await fetch('http://localhost:3000/api/canvas/createRoom',  {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/canvas/createRoom`,  {
                 method: 'POST',
                 headers:{
                   "content-type":"application/json",

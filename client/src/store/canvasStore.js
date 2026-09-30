@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { io } from "socket.io-client";
 import * as Y from "yjs";
 
-const socket = io("http://localhost:3000");
+const socket = io(import.meta.env.VITE_API_URL);
 
 const docs = new Map();
 

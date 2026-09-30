@@ -12,7 +12,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://cocos-canvas.vercel.app/",
   })
 );
 
@@ -22,7 +22,7 @@ const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "https://cocos-canvas.vercel.app/",
   },
 });
 
