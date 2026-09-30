@@ -10,9 +10,13 @@ import prisma from "./lib/prisma.js";
 
 const app = express();
 
+const allowedOrigins = [
+      "https://cocos-canvas-hvw2kxwtf-dotcom37s-projects.vercel.app",
+]
+
 app.use(
   cors({
-    origin: "https://cocos-canvas.vercel.app",
+    origin: allowedOrigins,
   })
 );
 
@@ -22,7 +26,7 @@ const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "https://cocos-canvas.vercel.app",
+    origin: allowedOrigins,
   },
 });
 
