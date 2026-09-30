@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import pool from "../lib/db.js";
+import prisma from "../lib/prisma.js";
 
 // --------------------------------------------------
 // Helper: Generate 6 digit OTP
@@ -54,6 +54,7 @@ const sendEmail = async (to, subject, htmlContent) => {
 
 export const signup = async (req, res) => {
   try {
+    console.log("babla")
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
@@ -61,14 +62,15 @@ export const signup = async (req, res) => {
         message: "Name, email and password are required",
       });
     }
-
+    console.log("babla2") 
     // Check if user already exists
-    const existingUser = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
-
-    if (existingUser.rows.length > 0) {
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
+    console.log("babla3")
+    if (existingUser) {
       return res.status(400).json({
         message: "User already exists",
       });
@@ -78,30 +80,39 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const result = await pool.query(
-      `INSERT INTO users
-       (name, email, password, is_verified)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [name, email, hashedPassword, false]
-    );
-    const userId = result.rows[0].id
+    const user = await prisma.user.create({
+      data: {
+        name: name,
+        email: email,
+        password: hashedPassword,
+        isVerified: false,
+      },
+    });
+
+    const userId = user.id;
+
     // Generate OTP
     const otp = generateOTP();
 
     // Delete previous signup OTP
-    await pool.query(
-      `DELETE FROM otp
-       WHERE email = $1 AND type = 'signup'`,
-      [email]
-    );
+    await prisma.otp.deleteMany({
+      where: {
+        email: email,
+        type: "signup",
+      },
+    });
 
     // Store OTP
-    await pool.query(
-      `INSERT INTO otp
-       (user_id,email, otp, type, attempts, expires_at)
-       VALUES ($1, $2, $3, $4,$5, NOW() + INTERVAL '10 minutes')`,
-      [userId, email, otp, "signup", 0]
-    );
+    await prisma.otp.create({
+      data: {
+        userId: userId,
+        email: email,
+        otp: otp,
+        type: "signup",
+        attempts: 0,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    });
 
     // Send OTP
     await sendEmail(
@@ -115,17 +126,16 @@ export const signup = async (req, res) => {
         <h1>${otp}</h1>
 
         <p>This OTP will expire in 10 minutes.</p>
-      `
+      `,
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Signup successful. OTP sent to your email.",
     });
-
   } catch (error) {
     console.error("Signup error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
@@ -145,26 +155,24 @@ export const verifyOTP = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      `SELECT *
-       FROM otp
-       WHERE email = $1
-       AND type = 'signup'
-       ORDER BY id DESC
-       LIMIT 1`,
-      [email]
-    );
+    const otpRecord = await prisma.otp.findFirst({
+      where: {
+        email: email,
+        type: "signup",
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!otpRecord) {
       return res.status(400).json({
         message: "OTP not found",
       });
     }
 
-    const otpRecord = result.rows[0];
-
     // Check expiry
-    if (new Date(otpRecord.expires_at) < new Date()) {
+    if (otpRecord.expiresAt < new Date()) {
       return res.status(400).json({
         message: "OTP expired",
       });
@@ -179,12 +187,16 @@ export const verifyOTP = async (req, res) => {
 
     // Wrong OTP
     if (otpRecord.otp !== otp) {
-      await pool.query(
-        `UPDATE otp
-         SET attempts = attempts + 1
-         WHERE id = $1`,
-        [otpRecord.id]
-      );
+      await prisma.otp.update({
+        where: {
+          id: otpRecord.id,
+        },
+        data: {
+          attempts: {
+            increment: 1,
+          },
+        },
+      });
 
       return res.status(400).json({
         message: "Invalid OTP",
@@ -192,31 +204,36 @@ export const verifyOTP = async (req, res) => {
     }
 
     // Verify user
-    await pool.query(
-      `UPDATE users
-       SET is_verified = true
-       WHERE email = $1`,
-      [email]
-    );
+    await prisma.user.update({
+      where: {
+        email: email,
+      },
+      data: {
+        isVerified: true,
+      },
+    });
 
     // Delete used OTP
-    await pool.query(
-      `DELETE FROM otp
-       WHERE id = $1`,
-      [otpRecord.id]
-    );
+    await prisma.otp.delete({
+      where: {
+        id: otpRecord.id,
+      },
+    });
 
-    const userResult = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    )
-    
-    if (userResult.rows.length == 0){
-      return res.json({
-        message:"invalid password or email"
-      })
+    // Get verified user
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
     }
-    const user = userResult.rows[0]
+
+    // Create JWT
     const token = jwt.sign(
       {
         id: user.id,
@@ -225,9 +242,10 @@ export const verifyOTP = async (req, res) => {
       process.env.JWT_SECRET,
       {
         expiresIn: "7d",
-      }
+      },
     );
-    res.json({
+
+    return res.json({
       message: "Email verified successfully",
       token,
       user: {
@@ -236,11 +254,10 @@ export const verifyOTP = async (req, res) => {
         email: user.email,
       },
     });
-
   } catch (error) {
     console.error("Verify OTP error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
@@ -260,23 +277,22 @@ export const login = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({
         message: "Invalid email or password",
       });
     }
-  
-    const user = result.rows[0];
 
     // Check password
     const passwordMatch = await bcrypt.compare(
       password,
-      user.password
+      user.password,
     );
 
     if (!passwordMatch) {
@@ -286,7 +302,7 @@ export const login = async (req, res) => {
     }
 
     // Check email verification
-    if (!user.is_verified) {
+    if (!user.isVerified) {
       return res.status(403).json({
         message: "Please verify your email first",
       });
@@ -301,10 +317,10 @@ export const login = async (req, res) => {
       process.env.JWT_SECRET,
       {
         expiresIn: "7d",
-      }
+      },
     );
 
-    res.json({
+    return res.json({
       message: "Login successful",
       token,
       user: {
@@ -313,11 +329,10 @@ export const login = async (req, res) => {
         email: user.email,
       },
     });
-
   } catch (error) {
     console.error("Login error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
@@ -337,13 +352,14 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
 
     // Don't reveal whether account exists
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.json({
         message: "If the account exists, a reset OTP has been sent",
       });
@@ -352,19 +368,24 @@ export const forgotPassword = async (req, res) => {
     const otp = generateOTP();
 
     // Remove previous reset OTP
-    await pool.query(
-      `DELETE FROM otp
-       WHERE email = $1 AND type = 'reset_password'`,
-      [email]
-    );
+    await prisma.otp.deleteMany({
+      where: {
+        email: email,
+        type: "reset_password",
+      },
+    });
 
     // Store reset OTP
-    await pool.query(
-      `INSERT INTO otp
-       (email, otp, type, attempts, expires_at)
-       VALUES ($1, $2, $3, $4, NOW() + INTERVAL '10 minutes')`,
-      [email, otp, "reset_password", 0]
-    );
+    await prisma.otp.create({
+      data: {
+        userId: user.id,
+        email: email,
+        otp: otp,
+        type: "reset_password",
+        attempts: 0,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      },
+    });
 
     await sendEmail(
       email,
@@ -377,17 +398,16 @@ export const forgotPassword = async (req, res) => {
         <h1>${otp}</h1>
 
         <p>This OTP will expire in 10 minutes.</p>
-      `
+      `,
     );
 
-    res.json({
+    return res.json({
       message: "If the account exists, a reset OTP has been sent",
     });
-
   } catch (error) {
     console.error("Forgot password error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
@@ -402,84 +422,85 @@ export const isAuthenticated = async (req, res) => {
     // protect middleware should already have verified JWT
     const userId = req.user.id;
 
-    const result = await pool.query(
-      `SELECT id, name, email, is_verified
-       FROM users
-       WHERE id = $1`,
-      [userId]
-    );
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isVerified: true,
+      },
+    });
 
-    if (result.rows.length === 0) {
-      
+    if (!user) {
       return res.status(401).json({
         authenticated: false,
       });
     }
 
-    res.json({
+    return res.json({
       authenticated: true,
-      user: result.rows[0],
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        is_verified: user.isVerified,
+      },
     });
-
   } catch (error) {
     console.error("Auth check error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }
 };
 
-export const getMe = async(req, res) =>{
-  try{
-    const userId = req.user.id
+// ==================================================
+// GET ME
+// ==================================================
 
-    const result = await pool.query(
-      `SELECT name, email, is_verified
-       FROM users
-       WHERE id = $1`,
-      [userId]
-    );
- 
-    if (result.rows.length===0){
-       res.status(401).json({ message: "user not found"})
-    }
-
-    else if (result.rows[0].is_verified===null){
-      res.status(401).json({ message: "user is not verified"})
-    }
-
-    res.status(200).json({ user : result.rows[0]})
-  }catch(error){
-    console.log("get me error:", error)
-    res.status(500).json({
-      message: "Server error",
-    });
-  }
-}
-
-//logout
-
-export const logout = async (req, res) => {
-  const { email } = req.body;
-
+export const getMe = async (req, res) => {
   try {
-    const result = await pool.query(
-      `UPDATE users
-       SET is_authenticated = false
-       WHERE email = $1`,
-      [email]
-    );
+    const userId = req.user.id;
 
-    res.status(200).json({
-      message: "User logged out"
+    const user = await prisma.User.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        name: true,
+        email: true,
+        isVerified: true,
+      },
     });
 
-  } catch (error) {
-    console.log("User logout failed:", error);
+    if (!user) {
+      return res.status(401).json({
+        message: "user not found",
+      });
+    }
 
-    res.status(500).json({
-      message: "Logout failed"
+    if (!user.isVerified) {
+      return res.status(401).json({
+        message: "user is not verified",
+      });
+    }
+
+    return res.status(200).json({
+      user: {
+        name: user.name,
+        email: user.email,
+        is_verified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.log("get me error:", error);
+
+    return res.status(500).json({
+      message: "Server error",
     });
   }
 };

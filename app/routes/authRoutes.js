@@ -6,8 +6,7 @@ import {
   login,
   forgotPassword,
   isAuthenticated,
-  getMe,
-  logout
+  getMe
 } from "../controller/authController.js";
 
 import protect from "../middleware/authMiddleware.js";

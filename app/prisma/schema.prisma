@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(120)
+  email       String       @unique @db.VarChar(255)
+  password    String       @db.VarChar(255)
+  isVerified  Boolean      @default(false) @map("is_verified")
+  otps        Otp[]
+  roomMembers RoomMember[]
+  rooms       Room[]
+
+  @@map("users")
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  email     String   @db.VarChar(255)
+  otp       String   @db.VarChar(10)
+  type      String   @db.VarChar(30)
+  attempts  Int      @default(0)
+  expiresAt DateTime @map("expires_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("otp")
+}
+
+model Room {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String?
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  canvasState CanvasState?
+  members     RoomMember[]
+  creator     User         @relation(fields: [createdBy], references: [email])
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id     Int    @id @default(autoincrement())
+  roomId String @map("room_id") @db.Uuid
+  userId Int    @map("user_id")
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+  @@map("room_members")
+}
+
+model CanvasState {
+  roomId    String   @id @map("room_id") @db.Uuid
+  objects   Json
+  updatedAt DateTime @default(now()) @map("updated_at")
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("canvas_state")
+}
